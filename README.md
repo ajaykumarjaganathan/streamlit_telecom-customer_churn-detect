@@ -1,6 +1,6 @@
-## IDG Customer Churn Predictor App
+## Telecommunication Customer Churn Predictor App
 
-The IDG Customer Churn Predictor App is an interactive Streamlit application designed to predict customer churn based on provided data. This README provides comprehensive instructions on creating, deploying, and using the app.
+The Telecommunication Customer Churn Predictor App is an interactive Streamlit application designed to predict customer churn based on provided data. This README provides comprehensive instructions on creating, deploying, and using the app.
 
 ### Table of Contents
 1. [Setup](#setup)
