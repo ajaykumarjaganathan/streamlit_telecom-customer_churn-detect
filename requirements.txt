@@ -105,4 +105,9 @@ WTForms
 xgboost
 xyzservices
 zipp
+streamlit
+pandas
+numpy
+scikit-learn
+streamlit
 setuptools
