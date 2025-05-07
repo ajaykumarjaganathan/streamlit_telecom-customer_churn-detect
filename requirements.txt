@@ -1,32 +1,10 @@
-streamlit>=1.31.1
-PyYAML>=6.0
-streamlit-authenticator>=0.3.1
-uuid>=1.30
-python-dotenv>=1.0.0
-pandas>=2.0.0
-numpy>=1.26.0
-Pillow>=10.0.0  # For image handling
-watchdog>=4.0.0  # For Streamlit file watcher
-streamlit>=1.31.1
-pandas>=2.0.0
-numpy>=1.26.0
-bcrypt>=4.0.0  # If using password hashing
-python-jose>=3.3.0  # For JWT support in auth
-scikit-learn>=1.0.0
-xgboost>=2.0.0
-protobuf<=3.20.0  # Resolves common Streamlit Cloud conflicts
-typing-extensions>=4.0.0
-# Core
 streamlit==1.31.1
 streamlit-authenticator==0.3.1
-
-# Auth & Config
-PyYAML==6.0
+PyYAML==6.0.1
 uuid==1.30
 python-dotenv==1.0.0
-
-# Optional (if needed)
 pandas==2.2.1
 numpy==1.26.0
 Pillow==10.2.0
 watchdog==4.0.0
+protobuf==3.20.3  # Important to prevent conflicts
