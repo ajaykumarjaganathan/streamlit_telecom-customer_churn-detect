@@ -123,9 +123,7 @@ def main():
         # GitHub and LinkedIn links
         st.markdown("**GitHub and LinkedIn Links:**")
         st.write("Check out the source code on GitHub:")
-        st.markdown("[![GitHub](https://img.shields.io/badge/GitHub-Repo-green?style=for-the-badge&logo=github)](https://github.com/IddieGod/Streamlit-Prediction-App-Churn-Analysis)")
-        st.write("Connect with me on LinkedIn:")
-        st.markdown("[![LinkedIn](https://img.shields.io/badge/LinkedIn-Profile-blue?style=for-the-badge&logo=linkedin)](https://www.linkedin.com/in/maanenyi-nyande/)")
-
+        st.markdown("[![GitHub](https://img.shields.io/badge/GitHub-Repo-green?style=for-the-badge&logo=github)](https://github.com/ajaykumarjaganathan/streamlit_telecom-customer_churn-detect.git)")
+      
 if __name__ == "__main__":
     main()
