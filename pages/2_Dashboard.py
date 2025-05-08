@@ -9,7 +9,7 @@ import leather
 import plotly.express as px
 import pandas as pd
 
-url = "https://raw.githubusercontent.com/ajaykumarjaganathan/streamlit_telecom-customer_churn-detect/main/churn_dataset.csv"
+url = "https://github.com/ajaykumarjaganathan/streamlit_telecom-customer_churn-detect/blob/main/churn_dataset.csv"
 df = pd.read_csv(url)
 
 
