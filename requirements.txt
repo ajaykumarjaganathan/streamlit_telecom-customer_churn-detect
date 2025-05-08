@@ -18,3 +18,4 @@ scikit-learn
 altair==5.5.0
 streamlit-authenticator==0.3.1
 streamlit_metrics
+pygal>=3.0.0
