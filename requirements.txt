@@ -1,3 +1,7 @@
+xgboost==2.0.3
+pygal==3.0.0
+leather==0.3.4
+
 scikit-learn==1.4.0
 joblib==1.2.0
 numpy==1.26.0
