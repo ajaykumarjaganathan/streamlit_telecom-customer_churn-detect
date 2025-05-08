@@ -20,3 +20,6 @@ streamlit_metrics
 pygal>=3.0.0
 joblib>=1.2.0
 scikit-learn>=1.0.0
+joblib==1.2.0 
+matplotlib-base==3.8.2  
+seaborn==0.13.0
