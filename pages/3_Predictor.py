@@ -1,6 +1,5 @@
 import pandas as pd
 import warnings
-import pickle
 import time
 import streamlit as st
 import plotly.graph_objects as go
@@ -11,11 +10,6 @@ from PIL import Image
 df = pd.read_csv('churn_dataset.csv')
 
 df.drop('customerID',axis = 1, inplace = True)
-
-# Load the model
-
-with open('clf_model.pickle', 'rb') as pickled_model:
-    xgb_pipe = pickle.load(pickled_model)
     
 interface = st.container()
 
@@ -165,16 +159,11 @@ with interface:
     st.subheader('Model Prediction')
 
     if st.button('Predict'):
-            
-        churn_probability = xgb_pipe.predict_proba(input_features)[0, 1]
-
-        with st.spinner('Sending input features to model...'):
-            time.sleep(2)
-
-        st.success('Prediction is ready')
-        time.sleep(1)
-        st.markdown(f'Churn probability is ***{churn_probability:.0%}***')
-
-        churn_label = "Yes" if churn_probability > 0.5 else "No"
+        # Since we removed the model, we'll just show a placeholder message
+        st.warning("Model prediction functionality is currently unavailable as the model file was removed.")
         
-        st.markdown(f'Churn prediction is ***{churn_label}***')
+        # Placeholder for what would normally be the prediction
+        # churn_probability = xgb_pipe.predict_proba(input_features)[0, 1]
+        # st.markdown(f'Churn probability is ***{churn_probability:.0%}***')
+        # churn_label = "Yes" if churn_probability > 0.5 else "No"
+        # st.markdown(f'Churn prediction is ***{churn_label}***')
