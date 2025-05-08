@@ -7,19 +7,11 @@ pandas==2.2.1
 numpy==1.26.0
 Pillow==10.2.0
 watchdog==4.0.0
-protobuf==3.20.3 
-streamlit==1.31.1
-pandas==2.2.1
+protobuf==3.20.3
 joblib==1.2.0
-matplotlib==3.7.4
-seaborn==0.12.2
-scikit-learn
+matplotlib==3.8.2  # Changed from matplotlib-base
+seaborn==0.13.0   # Using the newer version
+scikit-learn==1.4.0
 altair==5.5.0
-streamlit-authenticator==0.3.1
-streamlit_metrics
-pygal>=3.0.0
-joblib>=1.2.0
-scikit-learn>=1.0.0
-joblib==1.2.0 
-matplotlib-base==3.8.2  
-seaborn==0.13.0
+streamlit_metrics==0.1.0
+pygal==3.0.0
