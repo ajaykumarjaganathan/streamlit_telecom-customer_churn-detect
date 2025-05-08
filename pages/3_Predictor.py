@@ -1,130 +1,180 @@
-import streamlit as st
-import joblib
-import os
 import pandas as pd
+import warnings
+import pickle
+import time
+import streamlit as st
+import plotly.graph_objects as go
+import PIL
+from PIL import Image
 
-# Define model paths (adjust these to your actual file paths)
-preprocessor_path = 'models/preprocessor.joblib'
-dt_model_path = 'models/decision_tree_model.joblib'
-rf_model_path = 'models/random_forest_model.joblib'
 
-@st.cache_resource
-def load_models():
-    try:
-        # Load with explicit fix_imports and encoding parameters
-        with open(preprocessor_path, 'rb') as file:
-            preprocessor = joblib.load(file, fix_imports=True, encoding='latin1')
-            
-        with open(dt_model_path, 'rb') as file:
-            dt_model = joblib.load(file, fix_imports=True, encoding='latin1')
-            
-        with open(rf_model_path, 'rb') as file:
-            rf_model = joblib.load(file, fix_imports=True, encoding='latin1')
-            
-        return preprocessor, dt_model, rf_model
-    except Exception as e:
-        st.error(f"Failed to load models: {str(e)}")
-        return None, None, None
+df = pd.read_csv('telco-customer-churn.csv')
 
-def predict_churn(input_data, preprocessor, model):
-    try:
-        # Preprocess the input data
-        processed_data = preprocessor.transform(input_data)
-        
-        # Make prediction
-        prediction = model.predict(processed_data)
-        prediction_proba = model.predict_proba(processed_data)
-        
-        return prediction[0], prediction_proba[0]
-    except Exception as e:
-        st.error(f"Prediction failed: {str(e)}")
-        return None, None
+df.drop('customerID',axis = 1, inplace = True)
 
-def main():
-    # Load models once
-    preprocessor, dt_model, rf_model = load_models()
+# Load the model
+
+with open('clf_model.pickle', 'rb') as pickled_model:
+    xgb_pipe = pickle.load(pickled_model)
     
-    if None in [preprocessor, dt_model, rf_model]:
-        st.error("Critical error: Could not load one or more models")
-        return
+interface = st.container()
 
-    # UI Layout
-    st.title("Predict Customer Churn")
-    st.subheader("Please input the customer details below")
+with interface:
+    
+    # Create Encoding Dictionaries
+    yes_no_encoding = {'Yes': 1, 'No': 0}
+    gender_encoding = {'Male': 1, 'Female': 0}
+    internet_service_encoding = {'DSL': 2, 'Fiber optic': 1, 'None': 0}
+    contract_encoding = {'Month-to-month': 0, 'One year': 1, 'Two year': 2}
+    payment_method_encoding = {'Electronic check': 0, 'Mailed check': 1, 'Bank transfer (automatic)': 2, 'Credit card (automatic)': 3}
 
-    # Create a 3-column layout
-    col1, col2, col3 = st.columns(3)
+    # Preprocess categorical columns in the DataFrame
+    yes_no_columns = ['SeniorCitizen', 'Partner', 'Dependents', 'PhoneService', 'PaperlessBilling', 'Churn', 'MultipleLines',
+                      'OnlineSecurity', 'OnlineBackup', 'DeviceProtection', 'TechSupport', 'StreamingTV', 'StreamingMovies']
+    for col in yes_no_columns:
+        df[col] = df[col].replace(yes_no_encoding)
 
-    with col1:
-        monthly_revenue = st.number_input("Monthly Revenue", min_value=0.0, value=0.0, step=0.01)
-        monthly_minutes = st.number_input("Monthly Minutes", min_value=0.0, value=0.0, step=0.01)
-        director_calls = st.number_input("Director Assisted Calls", min_value=0, value=0, step=1)
-        overage_minutes = st.number_input("Overage Minutes", min_value=0.0, value=0.0, step=0.01)
-        roaming_calls = st.number_input("Roaming Calls", min_value=0, value=0, step=1)
+    df['gender'] = df['gender'].replace(gender_encoding)
+    df['InternetService'] = df['InternetService'].replace(internet_service_encoding)
+    df['Contract'] = df['Contract'].replace(contract_encoding)
+    df['PaymentMethod'] = df['PaymentMethod'].replace(payment_method_encoding)
 
-    with col2:
-        pct_change_minutes = st.number_input("Percentage Change Minutes", min_value=0.0, value=0.0, step=0.01)
-        pct_change_revenues = st.number_input("Percentage Change Revenues", min_value=0.0, value=0.0, step=0.01)
-        care_calls = st.number_input("Customer Care Calls", min_value=0, value=0, step=1)
-        received_calls = st.number_input("Received Calls", min_value=0, value=0, step=1)
-        outbound_calls = st.number_input("Outbound Calls", min_value=0, value=0, step=1)
 
-    with col3:
-        months_service = st.number_input("Months in Service", min_value=0, value=0, step=1)
-        unique_subs = st.number_input("Unique Subs", min_value=0, value=0, step=1)
-        active_subs = st.number_input("Active Subs", min_value=0, value=0, step=1)
-        income_group = st.selectbox("Income Group", ["Low", "Medium", "High"])
-        credit_rating = st.selectbox("Credit Rating", ["Poor", "Fair", "Good", "Excellent"])
+    st.title('Enter details')
+    st.subheader('Input Features')
 
-    # Product selection (outside columns for full width)
-    product = st.selectbox("Product", ["Basic", "Standard", "Premium"])
+    # Collect user input using Streamlit widgets
+    gender,senior_citizen,partner,dependents = st.columns(spec = [1,1,1,1])
 
-    # Model selection
-    model_choice = st.radio("Select Model", ["Decision Tree", "Random Forest"])
-
-    # Prediction button
-    if st.button("Predict Churn"):
-        # Prepare input data as DataFrame
-        input_data = pd.DataFrame([{
-            'Monthly Revenue': monthly_revenue,
-            'Monthly Minutes': monthly_minutes,
-            'Director Assisted Calls': director_calls,
-            'Overage Minutes': overage_minutes,
-            'Roaming Calls': roaming_calls,
-            'Percentage Change Minutes': pct_change_minutes,
-            'Percentage Change Revenues': pct_change_revenues,
-            'Customer Care Calls': care_calls,
-            'Received Calls': received_calls,
-            'Outbound Calls': outbound_calls,
-            'Months in Service': months_service,
-            'Unique Subs': unique_subs,
-            'Active Subs': active_subs,
-            'Income Group': income_group,
-            'Credit Rating': credit_rating,
-            'Product': product
-        }])
-
-        # Select model
-        model = dt_model if model_choice == "Decision Tree" else rf_model
-
-        # Make prediction
-        prediction, probabilities = predict_churn(input_data, preprocessor, model)
+    with gender:
         
-        if prediction is not None:
-            # Display results
-            st.subheader("Prediction Results")
-            
-            if prediction == 1:
-                st.error("Prediction: Customer will churn")
-            else:
-                st.success("Prediction: Customer will stay")
-            
-            st.write(f"Confidence: {probabilities[prediction]*100:.2f}%")
-            
-            # Show probability breakdown
-            st.write("Probability Breakdown:")
-            st.write(f"- Will stay: {probabilities[0]*100:.2f}%")
-            st.write(f"- Will churn: {probabilities[1]*100:.2f}%")
+        gender = st.radio(label = 'Gender',options = ['Male','Female'])
 
-if __name__ == "__main__":
-    main()
+    with senior_citizen:
+
+        senior_citizen = st.radio(label = 'Are you senior citizen?',options = ['Yes','No'])
+
+    with partner:
+
+        partner = st.radio(label = 'Dou you have a partner?',options = ['Yes','No'])
+
+    with dependents:
+
+        dependents = st.radio(label = 'Do you have dependents?',options = ['Yes','No'])
+
+    st.markdown(body = '***')
+
+
+    phone_service, multiplelines, online_security,online_backup = st.columns(spec = [1,1,1,1])
+
+    with phone_service:
+
+        phone_service = st.radio(label = 'Phone Service',options = ['Yes','No'])
+
+    with multiplelines:
+
+        multiplelines = st.radio(label = 'MultipleLines',options = ['Yes','No'])
+
+    with online_security:
+
+        online_security = st.radio(label = 'Online Security',options = ['Yes','No'])
+
+    with online_backup:
+
+        online_backup = st.radio(label = 'Online backup',options = ['Yes','No'])
+
+
+    st.markdown(body = '***')
+
+
+    device_protection, tech_support, streaming_tv,streaming_movies,paperless_billing = st.columns(spec = [1,1,1,1,1])
+
+    with device_protection:
+
+        device_protection = st.radio(label = 'Device Protection',options = ['Yes','No'])
+
+    with tech_support:
+
+        tech_support = st.radio(label = 'Tech support',options = ['Yes','No'])
+
+    with streaming_tv:
+
+        streaming_tv = st.radio(label = 'Streaming TV',options = ['Yes','No'])
+
+    with streaming_movies:
+
+        streaming_movies = st.radio(label = 'Streaming Movies',options = ['Yes','No'])
+
+    with paperless_billing:
+
+        paperless_billing = st.radio(label = 'Paperless Billing',options = ['Yes','No'])
+
+
+    st.markdown(body = '***')
+
+    internet_service = st.selectbox('Internet Service', ['DSL', 'Fiber optic', 'None'])
+    contract = st.selectbox('Contract', ['Month-to-month', 'One year', 'Two year'])
+    payment_method = st.selectbox('Payment Method', ['Electronic check', 'Mailed check',
+                                                         'Bank transfer (automatic)', 'Credit card (automatic)'])
+    monthly_charges = st.slider('Monthly Charges', min_value=float(df.MonthlyCharges.min()),
+                                    max_value=float(df.MonthlyCharges.max()), value=float(df.MonthlyCharges.mean()))
+
+    # Convert categorical inputs to numerical using the encoding dictionaries
+    
+    gender = gender_encoding[gender]
+    senior_citizen = yes_no_encoding[senior_citizen]
+    partner = yes_no_encoding[partner]
+    dependents = yes_no_encoding[dependents]
+    phone_service = yes_no_encoding[phone_service]
+    multiplelines = yes_no_encoding[multiplelines]
+    online_security = yes_no_encoding[online_security]
+    online_backup = yes_no_encoding[online_backup]
+    device_protection = yes_no_encoding[device_protection]
+    tech_support = yes_no_encoding[tech_support]
+    streaming_tv = yes_no_encoding[streaming_tv]
+    streaming_movies = yes_no_encoding[streaming_movies]
+    paperless_billing = yes_no_encoding[paperless_billing]
+    internet_service = internet_service_encoding[internet_service]
+    contract = contract_encoding[contract]
+    payment_method = payment_method_encoding[payment_method]
+
+    # Create input_features DataFrame for model input
+    input_features = pd.DataFrame({
+        'gender': [gender],
+        'SeniorCitizen': [senior_citizen],
+        'Partner': [partner],
+        'Dependents': [dependents],
+        'PhoneService': [phone_service],
+        'MultipleLines': [multiplelines],
+        'InternetService': [internet_service],
+        'OnlineSecurity': [online_security],
+        'OnlineBackup': [online_backup],
+        'DeviceProtection': [device_protection],
+        'TechSupport': [tech_support],
+        'StreamingTV': [streaming_tv],
+        'StreamingMovies': [streaming_movies],
+        'Contract': [contract],
+        'PaperlessBilling': [paperless_billing],
+        'PaymentMethod': [payment_method],
+        'MonthlyCharges': [monthly_charges]
+    })
+
+    
+    st.markdown('***')
+    
+    st.subheader('Model Prediction')
+
+    if st.button('Predict'):
+            
+        churn_probability = xgb_pipe.predict_proba(input_features)[0, 1]
+
+        with st.spinner('Sending input features to model...'):
+            time.sleep(2)
+
+        st.success('Prediction is ready')
+        time.sleep(1)
+        st.markdown(f'Churn probability is ***{churn_probability:.0%}***')
+
+        churn_label = "Yes" if churn_probability > 0.5 else "No"
+        
+        st.markdown(f'Churn prediction is ***{churn_label}***')
