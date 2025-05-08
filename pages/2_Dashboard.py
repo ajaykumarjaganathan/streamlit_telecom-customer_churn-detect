@@ -7,10 +7,11 @@ from streamlit_metrics import metric, metric_row
 import pygal
 import leather
 import plotly.express as px
+import pandas as pd
 
-# Load the dataset
-dataset_path = 'dataset/Churn Prediction Dataset.csv'
-df = pd.read_csv(dataset_path)
+url = "https://raw.githubusercontent.com/ajaykumarjaganathan/streamlit_telecom-customer_churn-detect/main/churn_dataset.csv"
+df = pd.read_csv(url)
+
 
 # Convert 'TotalCharges' column to numerical values
 df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce')
