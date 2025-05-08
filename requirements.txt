@@ -18,3 +18,5 @@ streamlit_metrics==0.1.0
 pygal==3.0.0
 setuptools==69.5.1
 leather==0.3.4
+xgboost==2.0.3
+xgboost-gpu==2.0.3
