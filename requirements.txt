@@ -1,3 +1,6 @@
+scikit-learn==1.4.0
+joblib==1.2.0
+numpy==1.26.0
 leather==0.3.4
 plotly==5.18.0
 streamlit==1.31.1
