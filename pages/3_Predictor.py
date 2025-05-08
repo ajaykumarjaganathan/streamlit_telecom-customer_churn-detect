@@ -1,45 +1,66 @@
 import os
+import urllib.request
 import streamlit as st
-import pandas as pd
 import joblib
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-
-# Set up paths - works both locally and in deployment
-MODEL_DIR = os.path.join(os.path.dirname(__file__), "..", "models")
-os.makedirs(MODEL_DIR, exist_ok=True)  # Create directory if it doesn't exist
+from pathlib import Path
 
 def load_model():
-    """Load the model with error handling"""
+    """Robust model loading with multiple fallback options"""
+    # Define all possible model paths
+    model_paths = [
+        # 1. Local models directory
+        Path(__file__).parent.parent / "models" / "rf_model.pkl",
+        
+        # 2. Absolute path (for some cloud deployments)
+        Path("/mount/src/streamlit_telecom-customer_churn-detect/models/rf_model.pkl"),
+        
+        # 3. Relative path (alternative)
+        Path("models/rf_model.pkl"),
+    ]
+    
+    # GitHub fallback URL
+    GITHUB_URL = "https://github.com/ajaykumarjaganathan/streamlit_telecom-customer_churn-detect/raw/main/models/rf_model.pkl"
+    
+    for path in model_paths:
+        try:
+            if path.exists():
+                return joblib.load(path)
+        except Exception as e:
+            st.warning(f"Attempt failed for {path}: {str(e)}")
+            continue
+    
+    # If all local attempts failed, try downloading from GitHub
     try:
-        # Try local file first
-        local_path = os.path.join(MODEL_DIR, "rf_model.pkl")
-        if os.path.exists(local_path):
-            return joblib.load(local_path)
-        
-        # Fallback to GitHub raw URL
-        model_url = "https://github.com/ajaykumarjaganathan/streamlit_telecom-customer_churn-detect/raw/main/models/rf_model.pkl"
-        local_file, _ = urllib.request.urlretrieve(model_url)
-        return joblib.load(local_file)
-        
+        temp_file = "temp_model.pkl"
+        urllib.request.urlretrieve(GITHUB_URL, temp_file)
+        model = joblib.load(temp_file)
+        st.success("Model downloaded from GitHub successfully!")
+        return model
     except Exception as e:
-        st.error(f"Model loading failed: {str(e)}")
-        st.info(f"Current directory: {os.getcwd()}")
-        st.info(f"Files in models directory: {os.listdir(MODEL_DIR) if os.path.exists(MODEL_DIR) else 'Directory not found'}")
-        return None
+        st.error(f"""
+        ❌ Failed to load model from all sources:
+        1. Local paths: {[str(p) for p in model_paths]}
+        2. GitHub URL: {GITHUB_URL}
+        
+        Error: {str(e)}
+        """)
+        st.stop()
 
 def main():
-    st.title("Customer Churn Predictor")
+    st.title("Customer Churn Prediction")
     
-    # Load model
+    # Load model with progress indicator
     with st.spinner("Loading prediction model..."):
-        model = load_model()
-    
-    if model is None:
-        st.error("Failed to load prediction model. Please check if the model file exists.")
-        return
-    
-    # Rest of your prediction code...
-    # Add your input form and prediction logic here
+        try:
+            model = load_model()
+            st.success("✅ Model loaded successfully!")
+            
+            # Your prediction code here
+            # Example:
+            # prediction = model.predict(...)
+            
+        except Exception as e:
+            st.error(f"Prediction failed: {str(e)}")
 
 if __name__ == "__main__":
     main()
