@@ -8,7 +8,7 @@ import PIL
 from PIL import Image
 
 
-df = pd.read_csv('telco-customer-churn.csv')
+df = pd.read_csv('churn_dataset.csv')
 
 df.drop('customerID',axis = 1, inplace = True)
 
