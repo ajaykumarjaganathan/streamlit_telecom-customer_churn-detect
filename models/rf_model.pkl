@@ -1,3 +1,4 @@
+import pickle
 import os
 import urllib.request
 import streamlit as st
