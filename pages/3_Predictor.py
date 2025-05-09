@@ -2,22 +2,18 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
+from sklearn.ensemble import RandomForestClassifier
 import os
 
-# Set page config
-st.set_page_config(
-    page_title="Telecom Churn Predictor",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Create sample data with consistent lengths
-def create_sample_data(size=1000):
-    return pd.DataFrame({
+# Create and save demo model with proper encoding
+def create_demo_model():
+    # Create sample data
+    np.random.seed(42)
+    size = 1000
+    data = {
         'gender': np.random.choice(['Male', 'Female'], size),
         'SeniorCitizen': np.random.choice([0, 1], size),
         'Partner': np.random.choice(['Yes', 'No'], size),
@@ -43,21 +39,20 @@ def create_sample_data(size=1000):
         'MonthlyCharges': np.round(np.random.uniform(20, 120, size), 2),
         'TotalCharges': np.round(np.random.uniform(20, 8000, size), 2),
         'Churn': np.random.choice(['Yes', 'No'], size, p=[0.3, 0.7])
-    })
-
-# Create and save demo model
-def create_demo_model():
-    df = create_sample_data(1000)
+    }
+    df = pd.DataFrame(data)
+    
+    # Separate features and target
     X = df.drop('Churn', axis=1)
     y = df['Churn']
     
-    # Identify feature types
+    # Define categorical and numerical features
     categorical_features = X.select_dtypes(include=['object']).columns
-    numeric_features = X.select_dtypes(include=['int64', 'float64']).columns
+    numerical_features = X.select_dtypes(include=['int64', 'float64']).columns
     
     # Create preprocessing pipeline
     preprocessor = ColumnTransformer([
-        ('num', StandardScaler(), numeric_features),
+        ('num', StandardScaler(), numerical_features),
         ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features)
     ])
     
@@ -67,28 +62,24 @@ def create_demo_model():
         ('classifier', RandomForestClassifier(n_estimators=100, random_state=42))
     ])
     
-    # Fit model
+    # Fit the pipeline
     pipeline.fit(X, y)
     
-    # Save artifacts
-    with open('churn_model.pkl', 'wb') as f:
+    # Save the pipeline
+    with open('churn_pipeline.pkl', 'wb') as f:
         pickle.dump(pipeline, f)
-    
-    # Also save preprocessor separately for demonstration
-    with open('preprocessor.pkl', 'wb') as f:
-        pickle.dump(preprocessor, f)
     
     return pipeline
 
-# Load model and preprocessor
+# Load or create model
 @st.cache_resource
 def load_model():
-    if not os.path.exists('churn_model.pkl'):
+    if not os.path.exists('churn_pipeline.pkl'):
         st.warning("Creating demo model...")
         return create_demo_model()
     
     try:
-        with open('churn_model.pkl', 'rb') as f:
+        with open('churn_pipeline.pkl', 'rb') as f:
             return pickle.load(f)
     except Exception as e:
         st.error(f"Error loading model: {str(e)}")
@@ -175,7 +166,7 @@ def main():
         input_df = pd.DataFrame([input_data])
         
         try:
-            # Make prediction (pipeline handles preprocessing)
+            # Make prediction (pipeline handles all preprocessing)
             proba = model.predict_proba(input_df)[0][1]
             
             # Display results
