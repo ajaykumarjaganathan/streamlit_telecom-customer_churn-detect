@@ -1,6 +1,6 @@
 ## Deployment Link
 
-https://apptelecom-customerchurn-detect-o2q2qvvma2zazrqoumuzeq.streamlit.app/
+https://apptelecom-customerchurn-detect-ak2006.streamlit.app/
 
 ## Telecommunication Customer Churn Predictor App
 
