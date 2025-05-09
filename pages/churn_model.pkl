@@ -1,0 +1,3 @@
+import pickle
+with open('churn_model.pkl', 'wb') as file:
+    pickle.dump(your_trained_model, file)
