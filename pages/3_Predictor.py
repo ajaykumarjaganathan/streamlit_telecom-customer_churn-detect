@@ -1,115 +1,55 @@
-import streamlit as st
 import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
 import pickle
-from sklearn.preprocessing import LabelEncoder
 
-# Load the trained model
-@st.cache_resource
-def load_model():
-    try:
-        with open('churn_model.pkl', 'rb') as file:
-            model = pickle.load(file)
-        return model
-    except FileNotFoundError:
-        st.error("Model file not found. Please ensure 'churn_model.pkl' is in the correct directory.")
-        return None
+# Sample data creation matching your model's expectations
+data = {
+    'gender': ['Male', 'Female']*500,
+    'SeniorCitizen': [0, 1]*500,
+    'Partner': ['Yes', 'No']*500,
+    'Dependents': ['Yes', 'No']*500,
+    'tenure': list(range(1, 1001)),
+    'PhoneService': ['Yes', 'No']*500,
+    'MultipleLines': ['Yes', 'No', 'No phone service']*334,
+    'InternetService': ['DSL', 'Fiber optic', 'No']*334,
+    'OnlineSecurity': ['Yes', 'No', 'No internet service']*334,
+    'OnlineBackup': ['Yes', 'No', 'No internet service']*334,
+    'DeviceProtection': ['Yes', 'No', 'No internet service']*334,
+    'TechSupport': ['Yes', 'No', 'No internet service']*334,
+    'StreamingTV': ['Yes', 'No', 'No internet service']*334,
+    'StreamingMovies': ['Yes', 'No', 'No internet service']*334,
+    'Contract': ['Month-to-month', 'One year', 'Two year']*334,
+    'PaperlessBilling': ['Yes', 'No']*500,
+    'PaymentMethod': ['Electronic check', 'Mailed check', 
+                     'Bank transfer (automatic)', 'Credit card (automatic)']*250,
+    'MonthlyCharges': [20 + x%80 for x in range(1000)],
+    'TotalCharges': [20 + x%80 * (x%72) for x in range(1000)],
+    'Churn': ['Yes', 'No']*500
+}
 
-# Create a simple model if none exists (for demo purposes)
-def create_demo_model():
-    from sklearn.ensemble import RandomForestClassifier
-    from sklearn.model_selection import train_test_split
-    
-    # Create sample data
-    data = {
-        'tenure': [1, 72, 12, 24, 3, 60],
-        'MonthlyCharges': [90.0, 30.0, 65.0, 50.0, 100.0, 45.0],
-        'Contract': ['Month-to-month', 'Two year', 'One year', 'One year', 'Month-to-month', 'Two year'],
-        'InternetService': ['Fiber optic', 'DSL', 'DSL', 'No', 'Fiber optic', 'DSL'],
-        'Churn': ['Yes', 'No', 'No', 'No', 'Yes', 'No']
-    }
-    df = pd.DataFrame(data)
-    
-    # Simple encoding
-    le = LabelEncoder()
-    df['Contract'] = le.fit_transform(df['Contract'])
-    df['InternetService'] = le.fit_transform(df['InternetService'])
-    
-    X = df.drop('Churn', axis=1)
-    y = le.fit_transform(df['Churn'])
-    
-    model = RandomForestClassifier()
-    model.fit(X, y)
-    
-    # Save the demo model
-    with open('churn_model.pkl', 'wb') as file:
-        pickle.dump(model, file)
-    
-    return model
+df = pd.DataFrame(data)
+X = df.drop('Churn', axis=1)
+y = df['Churn']
 
-# Main app function
-def main():
-    st.title("📱 Telecom Churn Predictor")
-    st.write("Enter customer details to predict churn probability")
-    
-    # Load or create model
-    model = load_model()
-    if model is None:
-        st.warning("Using a demo model with limited accuracy")
-        model = create_demo_model()
-    
-    # User input form
-    with st.form("customer_details"):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            tenure = st.slider("Tenure (months)", 1, 72, 12)
-            monthly_charges = st.number_input("Monthly Charges ($)", 20.0, 200.0, 65.0)
-            
-        with col2:
-            contract = st.selectbox("Contract Type", 
-                                  ["Month-to-month", "One year", "Two year"])
-            internet_service = st.selectbox("Internet Service", 
-                                         ["DSL", "Fiber optic", "No"])
-        
-        submitted = st.form_submit_button("Predict Churn")
-    
-    if submitted:
-        # Prepare input data
-        input_data = {
-            'tenure': tenure,
-            'MonthlyCharges': monthly_charges,
-            'Contract': contract,
-            'InternetService': internet_service
-        }
-        
-        # Convert to DataFrame
-        input_df = pd.DataFrame([input_data])
-        
-        # Simple encoding (match what the model expects)
-        le = LabelEncoder()
-        input_df['Contract'] = le.fit_transform(input_df['Contract'])
-        input_df['InternetService'] = le.fit_transform(input_df['InternetService'])
-        
-        # Make prediction
-        try:
-            probability = model.predict_proba(input_df)[0][1]  # Probability of churn (Yes)
-            
-            # Display results
-            st.subheader("Prediction Result")
-            
-            if probability > 0.5:
-                st.error(f"High churn risk: {probability:.1%} probability")
-                st.write("Suggested action: Offer retention incentives or improved service")
-            else:
-                st.success(f"Low churn risk: {probability:.1%} probability")
-                st.write("Customer appears satisfied with current service")
-            
-            # Show probability gauge
-            st.progress(probability)
-            st.caption(f"Churn probability: {probability:.1%}")
-            
-        except Exception as e:
-            st.error(f"Error making prediction: {str(e)}")
+# Create and save encoder
+categorical_features = X.select_dtypes(include=['object']).columns
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features)
+    ],
+    remainder='passthrough'
+)
 
-if __name__ == "__main__":
-    main()
+X_processed = preprocessor.fit_transform(X)
+
+# Train and save model
+model = RandomForestClassifier()
+model.fit(X_processed, y)
+
+with open('churn_model.pkl', 'wb') as f:
+    pickle.dump(model, f)
+
+with open('encoder.pkl', 'wb') as f:
+    pickle.dump(preprocessor, f)
