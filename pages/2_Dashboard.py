@@ -1,174 +1,227 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import altair as alt
-from streamlit_metrics import metric, metric_row
-import pygal
-import leather
+import numpy as np
 import plotly.express as px
-import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
+import pickle
+import os
 
-url = "https://github.com/ajaykumarjaganathan/streamlit_telecom-customer_churn-detect/blob/main/churn_dataset.csv"
-df = pd.read_csv(url)
-
-
-# Convert 'TotalCharges' column to numerical values
-df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce')
-
-# Set page title
-st.set_page_config(page_title="Visualization Dashboard")
-
-# Title for the page
-st.title("Visualization Dashboard")
-
-# Sidebar navigation
-option = st.sidebar.selectbox(
-    'Select:',
-    ('Analytics Dashboard', 'Key Performance Indicators for Churn Prediction')
+# Set page config
+st.set_page_config(
+    page_title="Telecom Churn Analytics",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-if option == 'Analytics Dashboard':
-    # Research question 1: Distribution of churn for different Internet service types
-    st.header("Research question 1: Distribution of churn for different Internet service types")
+# Sample data generation (replace with your actual data)
+@st.cache_data
+def load_sample_data():
+    np.random.seed(42)
+    size = 1000
+    data = {
+        'customerID': [f'CUST{i:04d}' for i in range(size)],
+        'gender': np.random.choice(['Male', 'Female'], size),
+        'SeniorCitizen': np.random.choice([0, 1], size, p=[0.8, 0.2]),
+        'Partner': np.random.choice(['Yes', 'No'], size),
+        'Dependents': np.random.choice(['Yes', 'No'], size),
+        'tenure': np.random.randint(1, 72, size),
+        'PhoneService': np.random.choice(['Yes', 'No'], size, p=[0.9, 0.1]),
+        'MultipleLines': np.random.choice(['Yes', 'No', 'No phone service'], size, p=[0.5, 0.4, 0.1]),
+        'InternetService': np.random.choice(['DSL', 'Fiber optic', 'No'], size, p=[0.4, 0.4, 0.2]),
+        'OnlineSecurity': np.random.choice(['Yes', 'No', 'No internet service'], size, p=[0.3, 0.5, 0.2]),
+        'OnlineBackup': np.random.choice(['Yes', 'No', 'No internet service'], size, p=[0.3, 0.5, 0.2]),
+        'DeviceProtection': np.random.choice(['Yes', 'No', 'No internet service'], size, p=[0.3, 0.5, 0.2]),
+        'TechSupport': np.random.choice(['Yes', 'No', 'No internet service'], size, p=[0.3, 0.5, 0.2]),
+        'StreamingTV': np.random.choice(['Yes', 'No', 'No internet service'], size, p=[0.4, 0.4, 0.2]),
+        'StreamingMovies': np.random.choice(['Yes', 'No', 'No internet service'], size, p=[0.4, 0.4, 0.2]),
+        'Contract': np.random.choice(['Month-to-month', 'One year', 'Two year'], size, p=[0.6, 0.2, 0.2]),
+        'PaperlessBilling': np.random.choice(['Yes', 'No'], size),
+        'PaymentMethod': np.random.choice([
+            'Electronic check', 
+            'Mailed check', 
+            'Bank transfer (automatic)', 
+            'Credit card (automatic)'
+        ], size),
+        'MonthlyCharges': np.round(np.random.uniform(20, 120, size), 2),
+        'TotalCharges': np.round(np.random.uniform(20, 8000, size), 2),
+        'Churn': np.random.choice(['Yes', 'No'], size, p=[0.3, 0.7])
+    }
+    return pd.DataFrame(data)
 
-    # Using Plotly Express
-    fig = px.bar(df, x='InternetService', color='Churn', barmode='group',
-                title='Churn Distribution for Internet Service Types (Plotly Express)',
-                category_orders={'InternetService': ['DSL', 'Fiber optic', 'No']},
-                color_discrete_map={'No': 'lightgreen', 'Yes': 'yellow'})
-    fig.update_xaxes(title="Internet Service Type")
-    fig.update_yaxes(title="Count")
-    st.plotly_chart(fig)
+# Load or create model
+@st.cache_resource
+def get_model():
+    if os.path.exists('churn_model.pkl'):
+        with open('churn_model.pkl', 'rb') as f:
+            return pickle.load(f)
+    else:
+        # Train a simple model if none exists
+        df = load_sample_data()
+        X = df.drop(['customerID', 'Churn'], axis=1)
+        y = df['Churn']
+        
+        # Simple encoding
+        le = LabelEncoder()
+        y = le.fit_transform(y)
+        
+        categorical_cols = X.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            X[col] = le.fit_transform(X[col])
+            
+        model = RandomForestClassifier(n_estimators=100, random_state=42)
+        model.fit(X, y)
+        
+        # Save model for future use
+        with open('churn_model.pkl', 'wb') as f:
+            pickle.dump(model, f)
+            
+        return model
 
-    # Research question 2: Impact of having a partner or dependents on customer churn
-    st.header("Research question 2: Impact of having a partner or dependents on customer churn")
-
-    # Using Altair
-    partner_chart = alt.Chart(df).mark_bar().encode(
-        x=alt.X('Partner:O', title='Partner Status'),
-        y=alt.Y('count():Q', title='Count'),
-        color='Churn:N'
-    ).properties(
-        title="Churn Distribution for Partner Status (Altair)"
-    )
-    st.altair_chart(partner_chart, use_container_width=True)
-
-    dependents_chart = alt.Chart(df).mark_bar().encode(
-        x=alt.X('Dependents:O', title='Dependents Status'),
-        y=alt.Y('count():Q', title='Count'),
-        color='Churn:N'
-    ).properties(
-        title="Churn Distribution for Dependents Status (Altair)"
-    )
-    st.altair_chart(dependents_chart, use_container_width=True)
-
-    # Research question 3: Influence of contract type on customer churn
-    st.header("Research question 3: Influence of contract type on customer churn")
-
-    # Using Plotly Express
-    fig2 = px.histogram(df, x='Contract', color='Churn', barmode='group')
-    fig2.update_layout(title="Churn Distribution for Contract Type (Plotly Express)")
-    st.plotly_chart(fig2, use_container_width=True)
-
-    # Research question 4: Impact of billing preference on customer churn
-    st.header("Research question 4: Impact of billing preference on customer churn")
-
-    # Convert 'Churn' column to boolean (0 for No, 1 for Yes)
-    df['Churn'] = df['Churn'].map({'No': 0, 'Yes': 1})
-
-    # Group data by Billing Preference and calculate churn
-    billing_churn = df.groupby('PaperlessBilling')['Churn'].sum().reset_index()
-
-    # Plot using Plotly Express
-    fig = px.bar(billing_churn, x='PaperlessBilling', y='Churn', 
-                labels={'PaperlessBilling': 'Billing Preference', 'Churn': 'Churn Count'},
-                title='Churn Distribution for Billing Preference (Plotly Express)')
-    st.plotly_chart(fig)
-
-
-
-    # Using Altair
-    gender_chart = alt.Chart(df).mark_bar().encode(
-        x=alt.X('gender', title='Gender'),
-        y=alt.Y('count()', title='Count'),
-        color='Churn:N'
-    ).properties(
-        title="Churn Distribution by Gender (Altair)"
-    )
-    st.altair_chart(gender_chart, use_container_width=True)
-
-    # Additional research questions
-    st.header("Additional Research Questions")
-
-    # Research question 6: Impact of tenure on customer churn
-    st.header("Research question 6: Impact of tenure on customer churn")
-
-    # Plot using Plotly Express
-    fig = px.histogram(df, x='tenure', color='Churn', nbins=20,
-                    labels={'tenure': 'Tenure', 'Churn': 'Churn'},
-                    title='Impact of Tenure on Customer Churn')
-    st.plotly_chart(fig)
-
-    # Research question 7: Relationship between total charges and churn
-    st.subheader("Research question 7: Relationship between total charges and churn")
-    charges_churn_scatter = alt.Chart(df).mark_circle(size=60).encode(
-        x='TotalCharges',
-        y='Churn',
-        color='Churn:N',
-        tooltip=['TotalCharges', 'Churn']
-    ).properties(
-        title="Churn vs Total Charges (Altair)"
-    ).interactive()
-    st.altair_chart(charges_churn_scatter, use_container_width=True)
-
-
+# Main app
+def main():
+    st.sidebar.title("Navigation")
+    page = st.sidebar.radio("Go to", ["Dashboard", "Predictor", "Data Explorer"])
     
-elif option == 'Key Performance Indicators for Churn Prediction':
-    # Key Performance Indicators (KPIs)
-    st.header("Key Performance Indicators (KPIs)")
+    df = load_sample_data()
+    model = get_model()
+    
+    if page == "Dashboard":
+        st.title("📊 Telecom Churn Dashboard")
+        
+        # KPI metrics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Customers", len(df))
+        with col2:
+            churn_rate = df[df['Churn'] == 'Yes'].shape[0] / len(df)
+            st.metric("Churn Rate", f"{churn_rate:.1%}")
+        with col3:
+            avg_tenure = df['tenure'].mean()
+            st.metric("Avg Tenure (months)", f"{avg_tenure:.1f}")
+        
+        # Charts
+        st.subheader("Churn Distribution")
+        fig1 = px.pie(df, names='Churn', title='Churn Distribution')
+        st.plotly_chart(fig1, use_container_width=True)
+        
+        st.subheader("Churn by Contract Type")
+        fig2 = px.histogram(df, x='Contract', color='Churn', barmode='group')
+        st.plotly_chart(fig2, use_container_width=True)
+        
+        st.subheader("Monthly Charges vs Tenure")
+        fig3 = px.scatter(df, x='tenure', y='MonthlyCharges', color='Churn')
+        st.plotly_chart(fig3, use_container_width=True)
+        
+    elif page == "Predictor":
+        st.title("🔮 Churn Predictor")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("Customer Details")
+            gender = st.selectbox("Gender", ['Male', 'Female'])
+            senior_citizen = st.selectbox("Senior Citizen", ['No', 'Yes'])
+            partner = st.selectbox("Partner", ['No', 'Yes'])
+            dependents = st.selectbox("Dependents", ['No', 'Yes'])
+            tenure = st.slider("Tenure (months)", 1, 72, 12)
+            contract = st.selectbox("Contract", ['Month-to-month', 'One year', 'Two year'])
+            
+        with col2:
+            st.subheader("Service Details")
+            internet_service = st.selectbox("Internet Service", ['DSL', 'Fiber optic', 'No'])
+            online_security = st.selectbox("Online Security", ['No', 'Yes', 'No internet service'])
+            tech_support = st.selectbox("Tech Support", ['No', 'Yes', 'No internet service'])
+            payment_method = st.selectbox("Payment Method", [
+                'Electronic check', 
+                'Mailed check', 
+                'Bank transfer (automatic)', 
+                'Credit card (automatic)'
+            ])
+            monthly_charges = st.number_input("Monthly Charges ($)", 20.0, 120.0, 65.0)
+            
+        if st.button("Predict Churn"):
+            # Prepare input data
+            input_data = {
+                'gender': gender,
+                'SeniorCitizen': 1 if senior_citizen == 'Yes' else 0,
+                'Partner': partner,
+                'Dependents': dependents,
+                'tenure': tenure,
+                'PhoneService': 'Yes',  # simplified for demo
+                'MultipleLines': 'No',
+                'InternetService': internet_service,
+                'OnlineSecurity': online_security,
+                'OnlineBackup': 'No',
+                'DeviceProtection': 'No',
+                'TechSupport': tech_support,
+                'StreamingTV': 'No',
+                'StreamingMovies': 'No',
+                'Contract': contract,
+                'PaperlessBilling': 'Yes',
+                'PaymentMethod': payment_method,
+                'MonthlyCharges': monthly_charges,
+                'TotalCharges': monthly_charges * tenure
+            }
+            
+            # Convert to DataFrame
+            input_df = pd.DataFrame([input_data])
+            
+            # Encode categorical variables (simplified)
+            categorical_cols = input_df.select_dtypes(include=['object']).columns
+            le = LabelEncoder()
+            for col in categorical_cols:
+                input_df[col] = le.fit_transform(input_df[col])
+            
+            # Make prediction
+            proba = model.predict_proba(input_df)[0][1]
+            
+            # Display result
+            st.subheader("Prediction Result")
+            if proba > 0.5:
+                st.error(f"High churn risk: {proba:.1%} probability")
+                st.write("Recommended actions: Offer discount, improve service, or provide retention offer")
+            else:
+                st.success(f"Low churn risk: {proba:.1%} probability")
+                st.write("Customer appears satisfied with current service")
+                
+            # Show probability gauge
+            fig = px.indicator(
+                mode="gauge+number",
+                value=proba,
+                title="Churn Probability",
+                gauge={'axis': {'range': [0, 1]},
+                       'steps': [
+                           {'range': [0, 0.5], 'color': "lightgreen"},
+                           {'range': [0.5, 1], 'color': "red"}],
+                       'threshold': {'line': {'color': "black", 'width': 4}, 'thickness': 0.75, 'value': 0.5}}
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+    elif page == "Data Explorer":
+        st.title("🔍 Data Explorer")
+        
+        st.write("Sample customer data (first 100 rows)")
+        st.dataframe(df.head(100))
+        
+        st.subheader("Filter Data")
+        col1, col2 = st.columns(2)
+        with col1:
+            churn_filter = st.selectbox("Filter by Churn", ['All', 'Yes', 'No'])
+        with col2:
+            contract_filter = st.selectbox("Filter by Contract", ['All', 'Month-to-month', 'One year', 'Two year'])
+            
+        filtered_df = df.copy()
+        if churn_filter != 'All':
+            filtered_df = filtered_df[filtered_df['Churn'] == churn_filter]
+        if contract_filter != 'All':
+            filtered_df = filtered_df[filtered_df['Contract'] == contract_filter]
+            
+        st.write(f"Showing {len(filtered_df)} records")
+        st.dataframe(filtered_df)
+        
+        st.subheader("Summary Statistics")
+        st.write(filtered_df.describe())
 
-    # Calculate Gross MRR Churn
-    gross_mrr_churn = 0.05  # Example value, replace with actual calculation
-
-    # Calculate Net MRR Churn
-    net_mrr_churn = 0.03  # Example value, replace with actual calculation
-
-    # Calculate Net Change in Customers
-    net_change_customers = 100  # Example value, replace with actual calculation
-
-    # Calculate Revenue Growth Rate
-    revenue_growth_rate = 0.10  # Example value, replace with actual calculation
-
-    # Calculate Activation Rate
-    activation_rate = 0.75  # Example value, replace with actual calculation
-
-    # Calculate DAU/MAU Ratio
-    dau_mau_ratio = 0.65  # Example value, replace with actual calculation
-
-    # Calculate Net Promoter Score (NPS)
-    nps = 75  # Example value, replace with actual calculation
-
-    # Calculate Customer Satisfaction Score (CSAT)
-    csat = 85  # Example value, replace with actual calculation
-
-    # Calculate Customer Lifetime Value (LTV)
-    clv = 1500  # Example value, replace with actual calculation
-
-    # Display metrics in columns
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("Financial Metrics")
-        metric("Gross MRR Churn", f"<span style='color:green'>{gross_mrr_churn}</span>")
-        metric("Net MRR Churn", f"<span style='color:yellow'>{net_mrr_churn}</span>")
-        metric("Net Change in Customers", f"<span style='color:blue'>{net_change_customers}</span>")
-        metric("Revenue Growth Rate", f"<span style='color:pink'>{revenue_growth_rate}</span>")
-
-    with col2:
-        st.subheader("Product Metrics")
-        metric("Activation Rate", f"<span style='color:purple'>{activation_rate}</span>")
-        metric("DAU/MAU Ratio", f"<span style='color:orange'>{dau_mau_ratio}</span>")
-        metric("Net Promoter Score (NPS)", f"<span style='color:green'>{nps}</span>")
-        metric("Customer Satisfaction (CSAT)", f"<span style='color:yellow'>{csat}</span>")
-        metric("Customer Lifetime Value (LTV)", f"<span style='color:blue'>{clv}</span>")
+if __name__ == "__main__":
+    main()
