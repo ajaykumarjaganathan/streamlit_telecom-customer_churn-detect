@@ -1,27 +1,23 @@
 import streamlit as st
 import pandas as pd
-import pickle
 import numpy as np
+import pickle
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+import os
 
-# Load model and preprocessing pipeline
-@st.cache_resource
-def load_artifacts():
-    try:
-        with open('churn_model.pkl', 'rb') as f:
-            model = pickle.load(f)
-        with open('preprocessor.pkl', 'rb') as f:
-            preprocessor = pickle.load(f)
-        return model, preprocessor
-    except FileNotFoundError:
-        st.error("Model files not found. Please ensure both 'churn_model.pkl' and 'preprocessor.pkl' exist.")
-        return None, None
+# Set page config
+st.set_page_config(
+    page_title="Telecom Churn Predictor",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # Create sample data with consistent lengths
-def create_sample_data():
-    size = 1000
-    return {
+def create_sample_data(size=1000):
+    return pd.DataFrame({
         'gender': np.random.choice(['Male', 'Female'], size),
         'SeniorCitizen': np.random.choice([0, 1], size),
         'Partner': np.random.choice(['Yes', 'No'], size),
@@ -45,48 +41,70 @@ def create_sample_data():
             'Credit card (automatic)'
         ], size),
         'MonthlyCharges': np.round(np.random.uniform(20, 120, size), 2),
-        'TotalCharges': np.round(np.random.uniform(20, 8000, size), 2)
-    }
+        'TotalCharges': np.round(np.random.uniform(20, 8000, size), 2),
+        'Churn': np.random.choice(['Yes', 'No'], size, p=[0.3, 0.7])
+    })
+
+# Create and save demo model
+def create_demo_model():
+    df = create_sample_data(1000)
+    X = df.drop('Churn', axis=1)
+    y = df['Churn']
+    
+    # Identify feature types
+    categorical_features = X.select_dtypes(include=['object']).columns
+    numeric_features = X.select_dtypes(include=['int64', 'float64']).columns
+    
+    # Create preprocessing pipeline
+    preprocessor = ColumnTransformer([
+        ('num', StandardScaler(), numeric_features),
+        ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features)
+    ])
+    
+    # Create complete pipeline
+    pipeline = Pipeline([
+        ('preprocessor', preprocessor),
+        ('classifier', RandomForestClassifier(n_estimators=100, random_state=42))
+    ])
+    
+    # Fit model
+    pipeline.fit(X, y)
+    
+    # Save artifacts
+    with open('churn_model.pkl', 'wb') as f:
+        pickle.dump(pipeline, f)
+    
+    # Also save preprocessor separately for demonstration
+    with open('preprocessor.pkl', 'wb') as f:
+        pickle.dump(preprocessor, f)
+    
+    return pipeline
+
+# Load model and preprocessor
+@st.cache_resource
+def load_model():
+    if not os.path.exists('churn_model.pkl'):
+        st.warning("Creating demo model...")
+        return create_demo_model()
+    
+    try:
+        with open('churn_model.pkl', 'rb') as f:
+            return pickle.load(f)
+    except Exception as e:
+        st.error(f"Error loading model: {str(e)}")
+        return None
 
 def main():
     st.title("📱 Telecom Churn Prediction")
     st.markdown("Predict customer churn probability based on service details")
-
-    model, preprocessor = load_artifacts()
     
-    if model is None or preprocessor is None:
-        if st.button("Create Demo Model"):
-            # Create and save demo artifacts
-            df = pd.DataFrame(create_sample_data())
-            X = df
-            y = np.random.choice(['Yes', 'No'], len(df))
-            
-            # Create preprocessing pipeline
-            categorical_features = X.select_dtypes(include=['object']).columns
-            numeric_features = X.select_dtypes(include=['int64', 'float64']).columns
-            
-            preprocessor = ColumnTransformer([
-                ('num', StandardScaler(), numeric_features),
-                ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features)
-            ])
-            
-            # Fit preprocessing
-            X_processed = preprocessor.fit_transform(X)
-            
-            # Train simple model
-            from sklearn.ensemble import RandomForestClassifier
-            model = RandomForestClassifier(n_estimators=100, random_state=42)
-            model.fit(X_processed, y)
-            
-            # Save artifacts
-            with open('churn_model.pkl', 'wb') as f:
-                pickle.dump(model, f)
-            with open('preprocessor.pkl', 'wb') as f:
-                pickle.dump(preprocessor, f)
-            
-            st.success("Demo model created! Refresh the page to use it.")
+    # Load model (will create demo if needed)
+    model = load_model()
+    
+    if model is None:
+        st.error("Failed to load or create model. Please check the error message.")
         return
-
+    
     # Input form
     with st.form("customer_input"):
         col1, col2 = st.columns(2)
@@ -157,28 +175,40 @@ def main():
         input_df = pd.DataFrame([input_data])
         
         try:
-            # Preprocess input
-            processed_input = preprocessor.transform(input_df)
-            
-            # Make prediction
-            proba = model.predict_proba(processed_input)[0][1]
+            # Make prediction (pipeline handles preprocessing)
+            proba = model.predict_proba(input_df)[0][1]
             
             # Display results
             st.subheader("Prediction Result")
             
             if proba > 0.7:
                 st.error(f"🚨 High churn risk: {proba:.1%}")
-                st.write("**Recommended actions:** Offer retention discount, assign account manager")
+                st.markdown("""
+                **Recommended actions:**
+                - Offer personalized retention discount
+                - Assign dedicated account manager
+                - Conduct exit interview
+                """)
             elif proba > 0.4:
                 st.warning(f"⚠️ Medium churn risk: {proba:.1%}")
-                st.write("**Recommended actions:** Proactive service check, loyalty benefits")
+                st.markdown("""
+                **Recommended actions:**
+                - Proactive service check
+                - Offer loyalty benefits
+                - Survey customer satisfaction
+                """)
             else:
                 st.success(f"✅ Low churn risk: {proba:.1%}")
-                st.write("**Status:** Customer appears satisfied")
+                st.markdown("""
+                **Status:** Customer appears satisfied
+                **Suggestions:**
+                - Continue current service quality
+                - Consider upselling opportunities
+                """)
             
             # Visual gauge
             st.progress(proba)
-            st.caption(f"Churn probability: {proba:.1%}")
+            st.metric("Churn Probability", f"{proba:.1%}")
             
         except Exception as e:
             st.error(f"Prediction failed: {str(e)}")
